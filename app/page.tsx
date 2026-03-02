@@ -48,7 +48,7 @@ export default function LoginPage() {
 
         {/* Glass Card */}
         <div className="w-full bg-white/20 backdrop-blur-md border border-white/10 shadow-2xl rounded-[40px] p-10">
-          <h2 className="text-2xl font-extrabold text-black mb-6">Log in</h2>
+          <h2 className="text-2xl font-extrabold text-black mb-6">เข้าสู่ระบบ (Log in)</h2>
 
           <div className="space-y-5">
             <input
@@ -77,7 +77,7 @@ export default function LoginPage() {
                 href="/signin"
                 className="px-6 py-2 bg-white rounded-full text-sm font-semibold text-black shadow-md hover:bg-gray-50 transition"
               >
-                Register
+                สมัครสมาชิก
               </Link>
 
               {/* ✅ Button with loading state */}
