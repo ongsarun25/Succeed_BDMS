@@ -2,26 +2,29 @@ import { createClient } from "@supabase/supabase-js";
 
 export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! 
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// ✅ Register - calls API route (server-side, safe)
 export async function registerUser(data: {
   firstName: string
   lastName: string
   username: string
   password: string
 }) {
-  const response = await fetch("/api/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
+  try {
+    const response = await fetch("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
 
-  const result = await response.json();
+    const result = await response.json().catch(() => ({ error: "Server error (Invalid JSON)" }));
 
-  if (!response.ok) return { success: false, error: result.error };
-  return { success: true };
+    if (!response.ok) return { success: false, error: result.error || "Unknown server error" };
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Network error" };
+  }
 }
 
 // ✅ Login with Supabase Auth

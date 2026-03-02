@@ -17,15 +17,15 @@ export default function RootLayout({
             <Link href="/" className="px-5 py-1.5 bg-white rounded-lg font-bold text-black shadow-sm text-sm">
               Log in
             </Link>
-            <Link href="/signin/step1" className="px-5 py-1.5 bg-white rounded-lg font-bold text-black shadow-sm text-sm">
+            <Link href="/signin" className="px-5 py-1.5 bg-white rounded-lg font-bold text-black shadow-sm text-sm">
               Sign in
             </Link>
           </div>
         </header>
 
         <main className="flex-1 flex flex-col w-full relative">
-         {children}
-          </main>
+          {children}
+        </main>
 
       </body>
     </html>

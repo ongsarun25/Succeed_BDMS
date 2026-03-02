@@ -74,7 +74,7 @@ export default function LoginPage() {
 
             <div className="flex justify-between items-center pt-4">
               <Link
-                href="/signin/step1"
+                href="/signin"
                 className="px-6 py-2 bg-white rounded-full text-sm font-semibold text-black shadow-md hover:bg-gray-50 transition"
               >
                 Register
