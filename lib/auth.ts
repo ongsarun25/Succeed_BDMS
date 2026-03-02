@@ -2,60 +2,26 @@ import { createClient } from "@supabase/supabase-js";
 
 export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! 
 );
 
-// ✅ Register - Supabase hashes password automatically
-export async function signUp(email: string, password: string) {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-  });
-  return { data, error };
-}
-
-// ✅ Login
-export async function signIn(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-  return { data, error };
-}
-
-// ✅ Logout
-export async function signOut() {
-  await supabase.auth.signOut();
-}
-
-// ✅ Register with Supabase Auth
+// ✅ Register - calls API route (server-side, safe)
 export async function registerUser(data: {
   firstName: string
   lastName: string
   username: string
   password: string
 }) {
-  // Supabase Auth requires email format
-  // We convert username → fake email for storage
-  const fakeEmail = `${data.username}@succeed.app`
+  const response = await fetch("/api/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
 
-  const { data: authData, error } = await supabase.auth.signUp({
-    email: fakeEmail,
-    password: data.password,
-    options: {
-      data: {
-        first_name: data.firstName,
-        last_name: data.lastName,
-        username: data.username,
-      }
-    }
-  })
+  const result = await response.json();
 
-  if (error) {
-    return { success: false, error: error.message }
-  }
-
-  return { success: true, user: authData.user }
+  if (!response.ok) return { success: false, error: result.error };
+  return { success: true };
 }
 
 // ✅ Login with Supabase Auth

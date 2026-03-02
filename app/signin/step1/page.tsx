@@ -9,15 +9,12 @@ import { ArrowRight } from "lucide-react";
 export default function RegisterStep1() {
   const { updateData } = useRegister();
   const router = useRouter();
-  console.log("Full context:", useRegister());
-  console.log("updateData type:", typeof updateData);
-  
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
 
 
   const handleNext = () => {
-    console.log("context check:", useRegister());
     // ✅ Validate before moving
     if (!firstName || !lastName) {
       alert("Please fill in all fields");
