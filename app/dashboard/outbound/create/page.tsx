@@ -6,6 +6,7 @@ import { ArrowLeft, Save, Loader2, UploadCloud } from "lucide-react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 import { supabase } from "@/lib/auth";
+import { useEffect } from "react";
 
 type ExcelItem = {
   PartID?: string;
@@ -21,6 +22,32 @@ export default function CreateOutboundPage() {
   const [customerId, setCustomerId] = useState("");
   const [shipmentId, setShipmentId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(true);
+
+  useEffect(() => {
+    const checkRole = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        router.push('/');
+        return;
+      }
+
+      const { data } = await supabase
+        .from('app_user')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (!data || data.role !== 'Manager') {
+        alert("Access Denied: คุณไม่มีสิทธิ์เข้าถึงหน้านี้ (เฉพาะผู้จัดการเท่านั้น)");
+        router.push('/dashboard/outbound');
+      } else {
+        setRoleLoading(false);
+      }
+    };
+
+    checkRole();
+  }, [router]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -168,6 +195,15 @@ export default function CreateOutboundPage() {
       setLoading(false);
     }
   };
+
+  if (roleLoading) {
+    return (
+      <div className="w-full h-full min-h-[80vh] flex flex-col items-center justify-center">
+        <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+        <p className="text-gray-500 font-medium text-lg">Verifying Access Level...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full min-h-[80vh] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500">

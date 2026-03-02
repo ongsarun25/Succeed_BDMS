@@ -1,9 +1,27 @@
 'use client';
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Package, ClipboardCheck, PackagePlus, Box } from "lucide-react";
+import { supabase } from "@/lib/auth";
 
 export default function OutboundMenuPage() {
+  const [role, setRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchRole = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const { data } = await supabase
+          .from('app_user')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
+        if (data) setRole(data.role);
+      }
+    };
+    fetchRole();
+  }, []);
   const menuItems = [
     {
       title: "1. Create Outbound",
@@ -28,6 +46,14 @@ export default function OutboundMenuPage() {
     }
   ];
 
+  // Filter out the 'Create Outbound' menu if the user is not a Manager
+  const visibleMenuItems = menuItems.filter(item => {
+    if (item.href === "/dashboard/outbound/create" && role !== 'Manager') {
+      return false; // Hide this menu from Staff
+    }
+    return true;
+  });
+
   return (
     <div className="w-full h-full min-h-[80vh] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500">
       <div className="w-full max-w-4xl text-center">
@@ -42,7 +68,7 @@ export default function OutboundMenuPage() {
         <p className="text-gray-500 mb-12 text-lg">เลือกระบวนการทำงานเพื่อดำเนินการต่อ</p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-          {menuItems.map((item, index) => (
+          {visibleMenuItems.map((item, index) => (
             <Link
               key={index}
               href={item.href}
