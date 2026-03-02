@@ -1,0 +1,68 @@
+'use client';
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRight, FileText } from "lucide-react";
+import Link from "next/link";
+
+export default function OutboundOrderPage() {
+  const router = useRouter();
+  const [orderId, setOrderId] = useState("");
+
+  const handleNext = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!orderId.trim()) {
+      alert("Please enter Order Number");
+      return;
+    }
+    // สั่งเปลี่ยนหน้าไปที่ detail พร้อมแนบเลข ID ไปด้วย
+    router.push(`/dashboard/outbound/order/detail?id=${orderId}`);
+  };
+
+  return (
+    <div className="w-full h-full min-h-[80vh] flex flex-col items-center justify-center p-6 animate-in slide-in-from-right-8 duration-500">
+      <div className="w-full max-w-2xl text-center">
+        
+        <h1 className="text-4xl md:text-5xl font-bold text-[#1a237e] mb-12 drop-shadow-sm flex items-center justify-center gap-4">
+          <FileText className="w-12 h-12 text-blue-600" />
+          Outbound Order
+        </h1>
+        
+        <form onSubmit={handleNext} className="max-w-md mx-auto flex flex-col items-center gap-8 relative">
+          
+          <div className="w-full text-left">
+            <label className="block text-2xl font-bold text-gray-900 mb-4 pl-2">
+              Outbound Order ID
+            </label>
+            <input
+              type="text"
+              value={orderId}
+              onChange={(e) => setOrderId(e.target.value)}
+              placeholder="e.g. ORD-00123"
+              className="w-full px-6 py-5 bg-white rounded-3xl shadow-sm border border-gray-100 focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 text-xl transition-all font-medium text-gray-800"
+              autoFocus
+            />
+          </div>
+          
+          {/* ปุ่ม Navigation ด้านล่าง */}
+          <div className="flex justify-between items-center w-full mt-8">
+            <Link 
+              href="/dashboard/outbound" 
+              className="w-16 h-16 bg-white rounded-[24px] shadow-md border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:shadow-lg transition-all hover:-translate-x-1"
+            >
+              <ArrowLeft className="w-8 h-8 text-black stroke-[3px]" />
+            </Link>
+            
+            <button 
+              type="submit"
+              className="w-16 h-16 bg-white rounded-[24px] shadow-md border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:shadow-lg transition-all hover:translate-x-1"
+            >
+              <ArrowRight className="w-8 h-8 text-black stroke-[3px]" />
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  );
+}
