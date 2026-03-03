@@ -56,7 +56,7 @@ export default function UnloadScanPage({ params }: { params: Promise<{ id: strin
 
         if (planData) {
             const groupedPlans = planData.reduce((acc: any[], p: any) => {
-                const existing = acc.find(item => item.part_id === p.part_id);
+                const existing = acc.find((item: any) => item.part_id === p.part_id);
                 if (existing) {
                     existing.expected_qty += p.expected_qty;
                 } else {
@@ -71,7 +71,18 @@ export default function UnloadScanPage({ params }: { params: Promise<{ id: strin
                 return acc;
             }, []);
             setPlans(groupedPlans);
-            if (groupedPlans.length > 0) setSelectedPart(groupedPlans[0].part_id);
+
+            // Smart auto-select logic
+            setSelectedPart(current => {
+                const currentItem = groupedPlans.find((p: any) => p.part_id === current);
+                // If there's no selection, or if the current selection is fully received, find the next incomplete item
+                if (!current || (currentItem && currentItem.received_qty >= currentItem.expected_qty)) {
+                    const nextIncomplete = groupedPlans.find((p: any) => p.received_qty < p.expected_qty);
+                    return nextIncomplete ? nextIncomplete.part_id : (groupedPlans[0]?.part_id || "");
+                }
+                // Otherwise, keep the current selection
+                return current;
+            });
         }
         setLoading(false);
     };
@@ -162,8 +173,15 @@ export default function UnloadScanPage({ params }: { params: Promise<{ id: strin
                     <div className="space-y-4">
                         {plans.map((p, idx) => {
                             const isDone = (p.received_qty || 0) >= p.expected_qty;
+                            const isSelected = selectedPart === p.part_id;
                             return (
-                                <div key={idx} className={`p-4 rounded-[20px] border-2 flex items-center flex-wrap justify-between gap-4 transition-colors ${isDone ? 'border-green-200 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
+                                <div
+                                    key={idx}
+                                    onClick={() => setSelectedPart(p.part_id)}
+                                    className={`p-4 rounded-[20px] border-2 cursor-pointer transition-all flex items-center flex-wrap justify-between gap-4 
+                                        ${isDone ? 'border-green-200 bg-green-50 opacity-60' :
+                                            isSelected ? 'border-blue-500 bg-blue-50 ring-4 ring-blue-100 scale-[1.02]' : 'border-gray-200 bg-white hover:border-blue-300'}`}
+                                >
                                     <div>
                                         <p className="font-bold text-lg text-gray-900">{p.part_id}</p>
                                         <p className="text-sm text-gray-500">{p.part_master?.part_name || "Unknown Part"}</p>
@@ -207,15 +225,12 @@ export default function UnloadScanPage({ params }: { params: Promise<{ id: strin
 
                             <div>
                                 <label className="text-sm font-bold text-blue-200 uppercase tracking-widest block mb-2">2. Visual QC Condition</label>
-                                <div className="grid grid-cols-3 gap-3">
-                                    <button type="button" onClick={() => { setCondition("Available"); if (serialNo.startsWith("MISSING-")) setSerialNo(""); }} className={`p-3 rounded-2xl font-bold border-2 transition-all flex items-center justify-center gap-2 ${condition === "Available" ? 'bg-green-500 border-green-400 text-white' : 'bg-white/10 border-white/20 text-gray-300 hover:bg-white/20'}`}>
-                                        <CheckCircle2 className="w-5 h-5" /> Available
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button type="button" onClick={() => setCondition("Available")} className={`p-3 rounded-2xl font-bold border-2 transition-all flex items-center justify-center gap-2 ${condition === "Available" ? 'bg-green-500 border-green-400 text-white shadow-lg scale-105' : 'bg-white/10 border-white/20 text-gray-300 hover:bg-white/20'}`}>
+                                        <CheckCircle2 className="w-5 h-5" /> Available (Good)
                                     </button>
-                                    <button type="button" onClick={() => { setCondition("Damaged"); if (serialNo.startsWith("MISSING-")) setSerialNo(""); }} className={`p-3 rounded-2xl font-bold border-2 transition-all flex items-center justify-center gap-2 ${condition === "Damaged" ? 'bg-red-500 border-red-400 text-white' : 'bg-white/10 border-white/20 text-gray-300 hover:bg-white/20'}`}>
+                                    <button type="button" onClick={() => setCondition("Damaged")} className={`p-3 rounded-2xl font-bold border-2 transition-all flex items-center justify-center gap-2 ${condition === "Damaged" ? 'bg-red-500 border-red-400 text-white shadow-lg scale-105' : 'bg-white/10 border-white/20 text-gray-300 hover:bg-white/20'}`}>
                                         <AlertTriangle className="w-5 h-5" /> Damaged
-                                    </button>
-                                    <button type="button" onClick={() => { setCondition("Missing"); setSerialNo(`MISSING-${Math.floor(Math.random() * 1000000)}`); }} className={`p-3 rounded-2xl font-bold border-2 transition-all flex items-center justify-center gap-2 ${condition === "Missing" ? 'bg-orange-500 border-orange-400 text-white' : 'bg-white/10 border-white/20 text-gray-300 hover:bg-white/20'}`}>
-                                        <FileQuestion className="w-5 h-5" /> Missing
                                     </button>
                                 </div>
                             </div>
@@ -226,19 +241,18 @@ export default function UnloadScanPage({ params }: { params: Promise<{ id: strin
                                     type="text"
                                     value={serialNo}
                                     onChange={(e) => setSerialNo(e.target.value)}
-                                    placeholder={condition === "Missing" ? "Auto-generated for Missing Item" : "Click here & scan barcode..."}
-                                    readOnly={condition === "Missing"}
+                                    placeholder="Click here & scan barcode..."
                                     autoFocus
-                                    className={`w-full p-5 rounded-2xl font-bold text-xl outline-none focus:ring-4 ring-blue-400/50 ${condition === "Missing" ? 'bg-orange-100 text-orange-800 border-2 border-orange-400 cursor-not-allowed' : 'bg-white text-black'}`}
+                                    className={`w-full p-5 rounded-2xl font-bold text-xl outline-none focus:ring-4 ring-blue-400/50 bg-white text-black`}
                                 />
                             </div>
 
                             <button
                                 type="submit"
                                 disabled={isSubmitting || !serialNo}
-                                className={`w-full py-4 mt-2 font-bold text-xl rounded-2xl shadow-md disabled:opacity-50 transition-colors ${condition === "Missing" ? 'bg-orange-500 hover:bg-orange-400 text-white' : 'bg-blue-500 hover:bg-blue-400 text-white'}`}
+                                className={`w-full py-4 mt-2 font-bold text-xl rounded-2xl shadow-md disabled:opacity-50 transition-colors bg-blue-500 hover:bg-blue-400 text-white`}
                             >
-                                {isSubmitting ? "Receiving..." : (condition === "Missing" ? "Log Missing Item" : "Register Item")}
+                                {isSubmitting ? "Receiving..." : "Register Item"}
                             </button>
 
                             {scanMessage.text && (

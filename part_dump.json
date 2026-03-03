@@ -1,0 +1,42 @@
+[
+  {
+    "part_id": "AC-9000",
+    "part_name": "Haier Air Conditioner 9000 BTU",
+    "uom": "Box",
+    "weight_kg": 15.5,
+    "created_at": "2026-02-26T13:05:51.161315+00:00",
+    "updated_at": "2026-02-26T13:05:51.161315+00:00"
+  },
+  {
+    "part_id": "COMP-001",
+    "part_name": "Haier Compressor Spare Part",
+    "uom": "Piece",
+    "weight_kg": 10,
+    "created_at": "2026-02-26T13:05:51.161315+00:00",
+    "updated_at": "2026-02-26T13:05:51.161315+00:00"
+  },
+  {
+    "part_id": "AC-COMP-12K",
+    "part_name": "Compressor 12000 BTU",
+    "uom": "PCS",
+    "weight_kg": 12.5,
+    "created_at": "2026-03-02T01:38:33.244618+00:00",
+    "updated_at": "2026-03-02T01:38:33.244618+00:00"
+  },
+  {
+    "part_id": "AC-COMP-18K",
+    "part_name": "Compressor 18000 BTU",
+    "uom": "PCS",
+    "weight_kg": 15,
+    "created_at": "2026-03-02T01:38:33.244618+00:00",
+    "updated_at": "2026-03-02T01:38:33.244618+00:00"
+  },
+  {
+    "part_id": "AC-COMP-24K",
+    "part_name": "Compressor 24000 BTU",
+    "uom": "PCS",
+    "weight_kg": 18.2,
+    "created_at": "2026-03-02T01:38:33.244618+00:00",
+    "updated_at": "2026-03-02T01:38:33.244618+00:00"
+  }
+]
