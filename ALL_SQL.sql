@@ -218,3 +218,15 @@ from
   join part_obj po on cs.serial_no::text = po.serial_no::text
   join part_master pm on po.part_id::text = pm.part_id::text
   left join location loc on cs.location_id::text = loc.location_id::text;
+
+  CREATE TABLE public.outbound_plan (
+  plan_id uuid not null default gen_random_uuid (),
+  outbound_id character varying null,
+  part_id character varying null,
+  expected_qty integer null,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint outbound_plan_pkey primary key (plan_id),
+  constraint fk_outplan_order foreign KEY (outbound_id) references outbound_order (outbound_id),
+  constraint fk_outplan_part foreign KEY (part_id) references part_master (part_id)
+);

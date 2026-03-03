@@ -59,6 +59,7 @@ export default function CreateOutboundPage() {
       if (!data || data.role !== 'Manager') {
         alert("Access Denied: คุณไม่มีสิทธิ์เข้าถึงหน้านี้ (เฉพาะผู้จัดการเท่านั้น)");
         router.push('/dashboard/outbound');
+      } else {
         setRoleLoading(false);
       }
     };
@@ -149,38 +150,27 @@ export default function CreateOutboundPage() {
       const randomNum = Math.floor(1000 + Math.random() * 9000);
       const newOutboundId = `OUT-${dateStr}-${randomNum}`;
 
-      const reservedSerials: string[] = [];
-
-      // 3. Find available stock for each Part ID
+      // 3. Check available stock for each Part ID (No reservation)
       for (const item of items) {
         const partId = item.PartID || item['Part ID'] || item.part_id;
         const reqQty = Number(item.Qty || item.qty);
 
         if (!partId || isNaN(reqQty) || reqQty <= 0) continue;
 
-        // Query available stock for this part
-        const { data: availableStock, error: stockError } = await supabase
+        // Query available stock count for this part
+        const { count, error: stockCountError } = await supabase
           .from('current_stock')
-          .select(`
-            serial_no,
-            part_obj!inner(part_id)
-          `)
+          .select('serial_no, part_obj!inner(part_id)', { count: 'exact', head: true })
           .eq('status', 'Available')
-          .eq('part_obj.part_id', partId)
-          .limit(reqQty);
+          .eq('part_obj.part_id', partId);
 
-        if (stockError) {
-          throw new Error(`Error fetching stock for ${partId}: ${stockError.message}`);
+        if (stockCountError) {
+          throw new Error(`Error fetching stock for ${partId}: ${stockCountError.message}`);
         }
 
-        if (!availableStock || availableStock.length < reqQty) {
-          throw new Error(`Not enough available stock for Part: ${partId}. Requested: ${reqQty}, Available: ${availableStock?.length || 0}`);
+        if (count === null || count < reqQty) {
+          throw new Error(`Not enough available stock for Part: ${partId}. Requested: ${reqQty}, Available: ${count || 0}`);
         }
-
-        // Add to reservation list
-        availableStock.forEach(stock => {
-          reservedSerials.push(stock.serial_no);
-        });
       }
 
       // 4. Create Outbound Order (Header)
@@ -191,39 +181,32 @@ export default function CreateOutboundPage() {
           order_date: new Date().toISOString().split('T')[0],
           customer_id: customerId,
           shipment_id: shipmentId,
-          // SKIP PENDING - The exact items are known, moving directly to Picked status
-          outstatus: 'Picked',
+          // Leave as Pending for manual pick
+          outstatus: 'Pending',
           pod_status: 'Pending'
         });
 
       if (headerError) throw headerError;
 
-      // 5. Create Outbound Details & Auto-Pick
-      const now = new Date().toISOString();
-      const detailsToInsert = reservedSerials.map(serial => ({
-        outbound_id: newOutboundId,
-        serial_no: serial,
-        time_picked_by: now,
-        picker_user_id: currentUser,
-      }));
+      // 5. Create Outbound Plan
+      const plansToInsert = items
+        .filter(item => (item.PartID || item['Part ID'] || item.part_id) && Number(item.Qty || item.qty) > 0)
+        .map(item => ({
+          outbound_id: newOutboundId,
+          part_id: item.PartID || item['Part ID'] || item.part_id,
+          expected_qty: Number(item.Qty || item.qty)
+        }));
 
-      const { error: detailsError } = await supabase
-        .from('outbound_detail')
-        .insert(detailsToInsert);
+      if (plansToInsert.length > 0) {
+        const { error: planError } = await supabase
+          .from('outbound_plan')
+          .insert(plansToInsert);
 
-      if (detailsError) throw detailsError;
+        if (planError) throw planError;
+      }
 
-      // 6. Update Stock to In Transit
-      // Note: If you have a trigger it might do this, but just to be sure
-      const { error: stockUpdateError } = await supabase
-        .from('current_stock')
-        .update({ status: 'In Transit' })
-        .in('serial_no', reservedSerials);
-
-      if (stockUpdateError) throw stockUpdateError;
-
-      alert(`✅ Created Outbound Order: ${newOutboundId} successfully! Automatically Picked ${reservedSerials.length} items.`);
-      router.push('/dashboard/outbound/history');
+      alert(`✅ Created Outbound Order: ${newOutboundId} successfully! Plan created. Redirecting to Pick List...`);
+      router.push('/dashboard/outbound/pick');
 
     } catch (err: any) {
       console.error(err);

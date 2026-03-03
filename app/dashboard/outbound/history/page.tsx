@@ -68,7 +68,8 @@ export default function OutboundHistoryPage() {
         switch (status) {
             case 'Pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
             case 'Picked': return 'bg-blue-100 text-blue-800 border-blue-200';
-            case 'Shipped': return 'bg-green-100 text-green-800 border-green-200';
+            case 'Shipped': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+            case 'Delivered': return 'bg-green-100 text-green-800 border-green-200';
             default: return 'bg-gray-100 text-gray-800 border-gray-200';
         }
     };
@@ -114,8 +115,10 @@ export default function OutboundHistoryPage() {
                         className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-gray-700 min-w-[150px] cursor-pointer"
                     >
                         <option value="All">All Status</option>
+                        <option value="Pending">Pending</option>
                         <option value="Picked">Picked</option>
                         <option value="Shipped">Shipped</option>
+                        <option value="Delivered">Delivered</option>
                     </select>
                 </div>
             </div>

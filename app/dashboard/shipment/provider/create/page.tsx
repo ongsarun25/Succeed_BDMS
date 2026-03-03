@@ -4,12 +4,14 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle, Building2, User, Phone, IdCard } from "lucide-react";
 
+import { supabase } from "@/lib/auth";
+
 function ProviderDetailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [generatedId, setGeneratedId] = useState("");
-  
+
   // ดึงข้อมูลจาก URL
   const contactPerson = searchParams.get('contactPerson') || "-";
   const companyName = searchParams.get('companyName') || "-";
@@ -22,28 +24,43 @@ function ProviderDetailContent() {
     setGeneratedId(`PRV-${randomNum}`);
   }, []);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setIsConfirmed(true);
-    // แจ้งเตือน และกลับไปหน้าเมนูหลัก
-    setTimeout(() => {
+
+    try {
+      const { error } = await supabase
+        .from('logistics_provider')
+        .insert({
+          provider_id: generatedId,
+          company_name: companyName,
+          contact_person: contactPerson,
+          phone: phone
+        });
+
+      if (error) throw error;
+
       alert(`✅ Provider ${generatedId} Added Successfully!`);
       router.push('/dashboard/shipment');
-    }, 500);
+    } catch (error: any) {
+      console.error("Error inserting provider:", error);
+      alert("Failed to add provider: " + error.message);
+      setIsConfirmed(false);
+    }
   };
 
   return (
     <div className="w-full h-full min-h-[80vh] flex flex-col items-center justify-center p-6 animate-in slide-in-from-right-8 duration-500">
       <div className="w-full max-w-3xl text-center">
-        
+
         <h1 className="text-4xl md:text-5xl font-bold text-[#1a237e] mb-10 drop-shadow-sm flex justify-center items-center gap-4">
           <Building2 className="w-12 h-12 text-blue-500" />
           New Provider Detail
         </h1>
 
         <div className="bg-white rounded-[32px] shadow-lg border border-gray-100 p-8 md:p-12 flex flex-col gap-8 relative text-left">
-          
+
           <div className="flex flex-col gap-6 bg-blue-50/50 p-6 md:p-8 rounded-3xl border border-blue-100">
-            
+
             {/* Provider ID (Auto-Generated) */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-blue-200/50 pb-4 gap-2">
               <span className="text-xl font-bold text-gray-500 flex items-center gap-2">
@@ -92,14 +109,14 @@ function ProviderDetailContent() {
 
           {/* Navigation */}
           <div className="flex justify-between items-center w-full mt-4">
-            <button 
+            <button
               onClick={() => router.back()}
               className="w-16 h-16 bg-white rounded-[24px] shadow-md border border-gray-100 flex items-center justify-center hover:bg-gray-50 hover:shadow-lg transition-all hover:-translate-x-1"
             >
               <ArrowLeft className="w-8 h-8 text-black stroke-[3px]" />
             </button>
-            
-            <button 
+
+            <button
               onClick={handleConfirm}
               disabled={isConfirmed}
               className="h-16 px-8 bg-white rounded-[24px] shadow-md border border-gray-100 flex items-center gap-3 hover:bg-green-50 hover:shadow-lg hover:border-green-200 transition-all hover:translate-x-1 group disabled:opacity-50"

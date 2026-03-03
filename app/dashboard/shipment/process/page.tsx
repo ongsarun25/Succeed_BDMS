@@ -31,7 +31,8 @@ export default function ShipmentProcessPage() {
           customer:customer_id ( name, address ),
           shipment:shipment_id ( license_plate )
         `)
-        .eq('outstatus', 'Picked')
+        .eq('outstatus', 'Shipped')
+        .eq('pod_status', 'Pending')
         .order('order_date', { ascending: true });
 
       if (error) throw error;

@@ -1,15 +1,33 @@
 'use client';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useInboundCreate } from "@/app/context/InboundCreateContext";
+import { supabase } from "@/lib/auth";
 
 export default function CreateInboundPage() {
   const router = useRouter();
   const { data, setData } = useInboundCreate();
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
+  const [providers, setProviders] = useState<any[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(true);
+
+  useEffect(() => {
+    const fetchProviders = async () => {
+      try {
+        const { data: pData, error } = await supabase.from('logistics_provider').select('provider_id, company_name');
+        if (error) throw error;
+        if (pData) setProviders(pData);
+      } catch (err) {
+        console.error("Error fetching providers:", err);
+      } finally {
+        setLoadingProviders(false);
+      }
+    };
+    fetchProviders();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -25,11 +43,43 @@ export default function CreateInboundPage() {
       console.log("🔵 Raw Excel rows:", rows)  // ← add this
       console.log("🔵 First row keys:", Object.keys(rows[0] || {}))  // ← add this
 
-      const parts = rows.map((row) => ({
-        part_id: String(row["part_id"] ?? row["Part ID"] ?? ""),
-        quantity: Number(row["quantity"] ?? row["Quantity"] ?? 0),
-        invoice_no: String(row["invoice_no"] ?? row["Invoice No"] ?? ""),
-      })).filter(p => p.part_id && p.quantity > 0)
+      // Parse Excel rows and handle merged/blank Part ID cells by carrying over the last seen Part ID
+      const aggregatedMap = new Map<string, any>();
+      let lastPartId = "";
+
+      rows.forEach((row) => {
+        let currentPartId = String(row["part_id"] ?? row["Part ID"] ?? "").trim();
+
+        // If current row has no Part ID, use the last seen one
+        if (currentPartId) {
+          lastPartId = currentPartId;
+        } else {
+          currentPartId = lastPartId;
+        }
+
+        const quantity = Number(row["quantity"] ?? row["Quantity"] ?? 0);
+        const invoice_no = String(row["invoice_no"] ?? row["Invoice No"] ?? "").trim();
+
+        // Only process if we have a valid part ID and a positive quantity
+        if (currentPartId && quantity > 0) {
+          if (aggregatedMap.has(currentPartId)) {
+            const existing = aggregatedMap.get(currentPartId);
+            existing.quantity += quantity;
+            // Optionally update invoice_no if we want the latest one, but usually it's the same
+            if (invoice_no && !existing.invoice_no) {
+              existing.invoice_no = invoice_no;
+            }
+          } else {
+            aggregatedMap.set(currentPartId, {
+              part_id: currentPartId,
+              quantity,
+              invoice_no,
+            });
+          }
+        }
+      });
+
+      const parts = Array.from(aggregatedMap.values());
 
       setData({ parts })
       console.log("🟢 Parts set in context:", parts)
@@ -106,15 +156,32 @@ export default function CreateInboundPage() {
           {/* Provider ID */}
           <div>
             <label className="text-xl font-bold text-gray-800 block mb-2">
-              Provider ID
+              Provider
             </label>
-            <input
-              type="text"
-              placeholder="e.g. PROV-HAIER"
-              value={data.provider_id}
-              onChange={(e) => setData({ provider_id: e.target.value })}
-              className="w-full px-6 py-4 rounded-[20px] bg-gray-50 text-black placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
+            <div className="relative">
+              <select
+                disabled={loadingProviders}
+                value={data.provider_id}
+                onChange={(e) => setData({ provider_id: e.target.value })}
+                className="w-full px-6 py-4 rounded-[20px] bg-gray-50 text-black appearance-none focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
+              >
+                <option value="" disabled>
+                  {loadingProviders ? "Loading..." : "Select Provider..."}
+                </option>
+                {providers.map((p) => (
+                  <option key={p.provider_id} value={p.provider_id}>
+                    {p.provider_id} - {p.company_name}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
+                {loadingProviders ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                ) : (
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                )}
+              </div>
+            </div>
           </div>
 
           {error && <p className="text-red-500 font-semibold">{error}</p>}

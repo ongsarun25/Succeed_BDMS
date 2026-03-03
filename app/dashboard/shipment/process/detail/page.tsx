@@ -67,11 +67,11 @@ function ShipmentDetailContent() {
 
       const now = new Date().toISOString();
 
-      // 1. Update Outbound Order status to Shipped and store POD
+      // 1. Update Outbound Order status to Delivered and store POD
       const { error: headerErr } = await supabase
         .from('outbound_order')
         .update({
-          outstatus: 'Shipped',
+          outstatus: 'Delivered',
           pod_status: 'Signed',
           pod_timestamp: now,
           pod_signature_image: podSignature // Using text input to simulate image url/base64 for now
