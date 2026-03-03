@@ -15,7 +15,7 @@ export default function CreateInboundDetailPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!data.parts.length) router.replace("/inbound/create");
+    if (!data.parts.length) router.replace("/dashboard/inbound/create");
   }, [data]);
 
   const handleCreate = async () => {
@@ -43,9 +43,9 @@ export default function CreateInboundDetailPage() {
 
   const handleBack = () => {
     if (isCreated) {
-      router.push("/inbound");
+      router.push("/dashboard");
     } else {
-      router.push("/inbound/create");
+      router.push("/dashboard/inbound/create");
     }
   };
 
@@ -66,7 +66,7 @@ export default function CreateInboundDetailPage() {
 
           {/* Data from Excel via context */}
           <div className="flex-1 space-y-4 px-4">
-            {data.parts.map((item, index) => (
+            {data.parts.map((item: any, index: number) => (
               <div key={index} className="grid grid-cols-2 text-xl font-medium text-gray-700">
                 <div>{item.part_id}</div>
                 <div className="text-right sm:text-left sm:pl-10">{item.quantity}</div>

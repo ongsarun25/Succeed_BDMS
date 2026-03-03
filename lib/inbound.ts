@@ -1,5 +1,12 @@
 import { supabase } from "./supabase"
-import { InboundOrder } from "@/app/context/UnloadContext"
+export type InboundOrder = {
+  inbound_id: string;
+  invoice_no: string;
+  arrival_date: string;
+  status: string;
+  container_no: string;
+  provider_id: string;
+};
 
 export async function findInboundOrder(inboundId: string): Promise<InboundOrder | null> {
   const { data, error } = await supabase
@@ -67,7 +74,7 @@ export async function updatePartConditions(
   updates: { in_detail_id: string; condition: string }[],
   inbound_id: string  // ← add this parameter
 ): Promise<{ success: boolean; error?: string }> {
-  
+
   // 1. Update all part conditions in parallel
   const results = await Promise.all(
     updates.map(({ in_detail_id, condition }) =>
@@ -106,7 +113,7 @@ export async function updatePartConditions(
 export async function createInboundOrder(input: {
   container_no: string
   provider_id: string
-  parts: { part_id: string; quantity: number; serial_no: string; invoice_no: string }[]
+  parts: { part_id: string; quantity: number; invoice_no: string }[]
 }): Promise<{ success: boolean; inbound_id?: string; error?: string }> {
 
   // 1. Generate running inbound_id
@@ -126,16 +133,16 @@ export async function createInboundOrder(input: {
   const newNum = String(lastNum + 1).padStart(4, "0")
   const inbound_id = `INB-${yyyymm}-${newNum}`
 
-  // 2. Insert into inbound_order
+  // 2. Insert into inbound_order (Draft Plan)
   const { error: orderError } = await supabase
     .from("inbound_order")
     .insert({
       inbound_id,
-      invoice_no:   input.parts[0]?.invoice_no ?? "",
+      invoice_no: input.parts[0]?.invoice_no ?? "",
       arrival_date: new Date().toISOString().split("T")[0],
       container_no: input.container_no,
-      provider_id:  input.provider_id,
-      status:       "Pending",
+      provider_id: input.provider_id,
+      status: "Draft Plan", // Changed from "Pending" to signify it's just a plan
     })
 
   if (orderError) {
@@ -143,38 +150,20 @@ export async function createInboundOrder(input: {
     return { success: false, error: orderError.message }
   }
 
-  // 3. Upsert serial numbers into part_obj first
-  const partObjRows = input.parts.map((p) => ({
-    serial_no: p.serial_no,
-    part_id: p.part_id,
-  }))
-
-  const { error: partObjError } = await supabase
-    .from("part_obj")
-    .upsert(partObjRows, { onConflict: "serial_no" })
-
-  if (partObjError) {
-    console.error("Part obj insert error:", partObjError.message)
-    return { success: false, error: partObjError.message }
-  }
-
-  // 4. Insert into inbound_detail
-  const details = input.parts.map((p) => ({
+  // 3. Insert into inbound_plan
+  const plans = input.parts.map((p) => ({
     inbound_id,
-    serial_no: p.serial_no,
-    condition: "Good",
-    time_received_by: new Date().toISOString(),
+    part_id: p.part_id,
+    expected_qty: p.quantity,
   }))
 
-  console.log("🔵 details to insert:", details)
+  const { error: planError } = await supabase
+    .from("inbound_plan")
+    .insert(plans)
 
-  const { error: detailError } = await supabase
-    .from("inbound_detail")
-    .insert(details)
-
-  if (detailError) {
-    console.error("Detail insert error:", detailError.message)
-    return { success: false, error: detailError.message }
+  if (planError) {
+    console.error("Plan insert error:", planError.message)
+    return { success: false, error: planError.message }
   }
 
   return { success: true, inbound_id }

@@ -140,7 +140,7 @@ export default function CreateOutboundPage() {
             serial_no,
             part_obj!inner(part_id)
           `)
-          .eq('status', 'Stored')
+          .eq('status', 'Available')
           .eq('part_obj.part_id', partId)
           .limit(reqQty);
 

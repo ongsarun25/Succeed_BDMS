@@ -1,0 +1,42 @@
+[
+  {
+    "serial_no": "u38",
+    "condition": "Available",
+    "location_id": "DOCK-01",
+    "status": "Receiving",
+    "created_at": "2026-03-02T21:31:03.581486+00:00",
+    "updated_at": "2026-03-02T21:31:03.581486+00:00"
+  },
+  {
+    "serial_no": "MISSING-595096",
+    "condition": "Missing",
+    "location_id": "DOCK-01",
+    "status": "Receiving",
+    "created_at": "2026-03-02T21:30:55.822582+00:00",
+    "updated_at": "2026-03-02T21:30:55.822582+00:00"
+  },
+  {
+    "serial_no": "MISSING-184860",
+    "condition": "Missing",
+    "location_id": "DOCK-01",
+    "status": "Receiving",
+    "created_at": "2026-03-02T21:30:02.699242+00:00",
+    "updated_at": "2026-03-02T21:30:02.699242+00:00"
+  },
+  {
+    "serial_no": "22",
+    "condition": "Available",
+    "location_id": "DOCK-01",
+    "status": "Receiving",
+    "created_at": "2026-03-02T21:29:54.524187+00:00",
+    "updated_at": "2026-03-02T21:29:54.524187+00:00"
+  },
+  {
+    "serial_no": "33",
+    "condition": "Damaged",
+    "location_id": "QA-01",
+    "status": "Quarantine",
+    "created_at": "2026-03-02T21:29:51.837339+00:00",
+    "updated_at": "2026-03-02T21:29:51.837339+00:00"
+  }
+]

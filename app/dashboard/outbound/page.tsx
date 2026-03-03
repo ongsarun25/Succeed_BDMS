@@ -63,7 +63,7 @@ export default function OutboundMenuPage() {
         </div>
 
         <h1 className="text-4xl md:text-5xl font-bold text-[#1a237e] mb-4 drop-shadow-sm">
-          Outbound (เบิกจ่ายสินค้า)
+          Outbound
         </h1>
         <p className="text-gray-500 mb-12 text-lg">เลือกระบวนการทำงานเพื่อดำเนินการต่อ</p>
 

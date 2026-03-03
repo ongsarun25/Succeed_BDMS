@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogIn, LogOut, Package, UserCircle } from "lucide-react";
+import { LogIn, LogOut, Package, UserCircle, Boxes } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -43,15 +43,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Sidebar */}
       <aside className="w-64 bg-[#0a173b] text-white flex flex-col py-8 shadow-2xl z-10 justify-between">
         <div>
-          <h2 className="text-xl font-bold text-center mb-10">MENU</h2>
+          <div className="flex justify-center mb-10 px-4">
+            <Image src="/logo.png" alt="Succeed Logo" width={160} height={80} priority className="object-contain" />
+          </div>
           <nav className="flex flex-col gap-2 px-4">
 
             {/* Inbound Menu */}
             <Link
               href="/dashboard"
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition ${pathname === '/dashboard'
-                  ? 'bg-white/20 font-bold text-white shadow-inner' // สไตล์ตอนถูกเลือก (Highlight)
-                  : 'hover:bg-white/5 font-semibold text-gray-300'  // สไตล์ตอนไม่ได้เลือก
+                ? 'bg-white/20 font-bold text-white shadow-inner' // สไตล์ตอนถูกเลือก (Highlight)
+                : 'hover:bg-white/5 font-semibold text-gray-300'  // สไตล์ตอนไม่ได้เลือก
                 }`}
             >
               <LogIn className="w-5 h-5" />
@@ -62,8 +64,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link
               href="/dashboard/outbound"
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition ${pathname.includes('/outbound')
-                  ? 'bg-white/20 font-bold text-white shadow-inner'
-                  : 'hover:bg-white/5 font-semibold text-gray-300'
+                ? 'bg-white/20 font-bold text-white shadow-inner'
+                : 'hover:bg-white/5 font-semibold text-gray-300'
                 }`}
             >
               <LogOut className="w-5 h-5" />
@@ -74,12 +76,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link
               href="/dashboard/shipment"
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition ${pathname.includes('/shipment')
-                  ? 'bg-white/20 font-bold text-white shadow-inner'
-                  : 'hover:bg-white/5 font-semibold text-gray-300'
+                ? 'bg-white/20 font-bold text-white shadow-inner'
+                : 'hover:bg-white/5 font-semibold text-gray-300'
                 }`}
             >
               <Package className="w-5 h-5" />
               <span>Shipment</span>
+            </Link>
+
+            {/* Current Stock Menu */}
+            <Link
+              href="/dashboard/inventory"
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition ${pathname.includes('/inventory')
+                ? 'bg-white/20 font-bold text-white shadow-inner'
+                : 'hover:bg-white/5 font-semibold text-gray-300'
+                }`}
+            >
+              <Boxes className="w-5 h-5" />
+              <span>Current Stock</span>
             </Link>
 
           </nav>
@@ -115,11 +129,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main Content Area */}
       <main className="flex-1 relative flex flex-col items-center justify-center p-8">
-        {/* Logo Top Left */}
-        <div className="absolute top-6 left-8 -mt-10">
-          <Image src="/logo.png" alt="Succeed Logo" width={300} height={200} priority />
-        </div>
-
         {/* Render Page Content Here */}
         {children}
       </main>

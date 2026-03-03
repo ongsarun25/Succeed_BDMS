@@ -18,26 +18,25 @@ export default function CreateInboundPage() {
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = (evt) => {
-  const workbook = XLSX.read(evt.target?.result, { type: "binary" });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet) as any[];
+      const workbook = XLSX.read(evt.target?.result, { type: "binary" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet) as any[];
 
-  console.log("🔵 Raw Excel rows:", rows)  // ← add this
-  console.log("🔵 First row keys:", Object.keys(rows[0] || {}))  // ← add this
+      console.log("🔵 Raw Excel rows:", rows)  // ← add this
+      console.log("🔵 First row keys:", Object.keys(rows[0] || {}))  // ← add this
 
-  const parts = rows.map((row) => ({
-    part_id:    String(row["part_id"]    ?? row["Part ID"]    ?? ""),
-    quantity:   Number(row["quantity"]   ?? row["Quantity"]   ?? 0),
-    serial_no:  String(row["serial_no"]  ?? row["Serial No"]  ?? ""),
-    invoice_no: String(row["invoice_no"] ?? row["Invoice No"] ?? ""),
-  })).filter(p => p.part_id && p.serial_no)
+      const parts = rows.map((row) => ({
+        part_id: String(row["part_id"] ?? row["Part ID"] ?? ""),
+        quantity: Number(row["quantity"] ?? row["Quantity"] ?? 0),
+        invoice_no: String(row["invoice_no"] ?? row["Invoice No"] ?? ""),
+      })).filter(p => p.part_id && p.quantity > 0)
 
-  setData({ parts })
-  console.log("🟢 Parts set in context:", parts)
-};
+      setData({ parts })
+      console.log("🟢 Parts set in context:", parts)
+    };
     reader.readAsBinaryString(file);
   };
-  
+
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
     if (!data.parts.length) {
@@ -53,10 +52,10 @@ export default function CreateInboundPage() {
       return;
     }
     setError("");
-    router.push("/inbound/create/detail");
+    router.push("/dashboard/inbound/create/detail");
   };
 
-  
+
 
   return (
     <div className="w-full h-full min-h-[80vh] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500">
@@ -124,7 +123,7 @@ export default function CreateInboundPage() {
           <div className="flex justify-between items-center mt-4">
             <button
               type="button"
-              onClick={() => router.push("/inbound")}
+              onClick={() => router.push("/dashboard")}
               className="w-16 h-16 bg-white rounded-[24px] shadow-md border border-gray-100 flex items-center justify-center hover:bg-gray-50 transition hover:-translate-x-1"
             >
               <ArrowLeft className="w-8 h-8 text-black stroke-[3px]" />
