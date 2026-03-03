@@ -27,12 +27,24 @@ export default function ConfirmationPage() {
     // Form State
     const [serialNo, setSerialNo] = useState("");
     const [locationId, setLocationId] = useState("");
+    const [locations, setLocations] = useState<{ location_id: string, zone_type: string }[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [message, setMessage] = useState({ text: "", type: "" });
 
     useEffect(() => {
         fetchDockItems();
+        fetchLocations();
     }, []);
+
+    const fetchLocations = async () => {
+        const { data } = await supabase
+            .from('location')
+            .select('location_id, zone_type')
+            .neq('location_id', 'DOCK-01')
+            .neq('location_id', 'QA-01');
+
+        if (data) setLocations(data);
+    };
 
     const fetchDockItems = async () => {
         setLoading(true);
@@ -133,14 +145,19 @@ export default function ConfirmationPage() {
                             </div>
 
                             <div>
-                                <label className="text-sm font-bold text-emerald-200 uppercase tracking-widest block mb-2">2. Scan Location (Destination)</label>
-                                <input
-                                    type="text"
+                                <label className="text-sm font-bold text-emerald-200 uppercase tracking-widest block mb-2">2. Select Location (Destination)</label>
+                                <select
                                     value={locationId}
                                     onChange={(e) => setLocationId(e.target.value)}
-                                    placeholder="Rack / Bin barcode..."
-                                    className="w-full p-5 rounded-2xl bg-emerald-800 text-white placeholder-emerald-500 font-bold border border-emerald-600 outline-none focus:bg-white focus:text-black focus:ring-4 transition-colors"
-                                />
+                                    className="w-full p-5 rounded-2xl bg-emerald-800 text-white placeholder-emerald-500 font-bold border border-emerald-600 outline-none focus:bg-white focus:text-black focus:ring-4 transition-colors appearance-none [&>option]:text-black"
+                                >
+                                    <option value="" disabled>Select Rack / Bin...</option>
+                                    {locations.map(loc => (
+                                        <option key={loc.location_id} value={loc.location_id}>
+                                            {loc.location_id} ({loc.zone_type})
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
 
                             <button
