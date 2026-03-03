@@ -21,8 +21,26 @@ export default function CreateOutboundPage() {
   const [file, setFile] = useState<File | null>(null);
   const [customerId, setCustomerId] = useState("");
   const [shipmentId, setShipmentId] = useState("");
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [shipments, setShipments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [roleLoading, setRoleLoading] = useState(true);
+
+  useEffect(() => {
+    fetchCustomersAndShipments();
+  }, []);
+
+  const fetchCustomersAndShipments = async () => {
+    try {
+      const { data: cData } = await supabase.from('customer').select('*');
+      if (cData) setCustomers(cData);
+
+      const { data: sData } = await supabase.from('shipment').select('shipment_id, license_plate');
+      if (sData) setShipments(sData);
+    } catch (err) {
+      console.error("Error fetching predefined data", err);
+    }
+  };
 
   useEffect(() => {
     const checkRole = async () => {
@@ -226,27 +244,47 @@ export default function CreateOutboundPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="text-lg font-bold text-gray-900 mb-2 ml-2 block">Customer ID</label>
-                <input
-                  type="text"
-                  required
-                  value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
-                  placeholder="e.g. CUST-001"
-                  className="w-full px-5 py-4 bg-gray-50 rounded-2xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 text-lg transition-all"
-                />
+                <label className="text-lg font-bold text-gray-900 mb-2 ml-2 block">Customer</label>
+                <div className="relative">
+                  <select
+                    required
+                    value={customerId}
+                    onChange={(e) => setCustomerId(e.target.value)}
+                    className="w-full px-5 py-4 bg-gray-50 rounded-2xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 text-lg transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="" disabled>Select Customer...</option>
+                    {customers.map(c => (
+                      <option key={c.customer_id} value={c.customer_id}>
+                        {c.customer_id} - {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
+                </div>
               </div>
 
               <div>
-                <label className="text-lg font-bold text-gray-900 mb-2 ml-2 block">Shipment ID</label>
-                <input
-                  type="text"
-                  required
-                  value={shipmentId}
-                  onChange={(e) => setShipmentId(e.target.value)}
-                  placeholder="e.g. SHIP-001"
-                  className="w-full px-5 py-4 bg-gray-50 rounded-2xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 text-lg transition-all"
-                />
+                <label className="text-lg font-bold text-gray-900 mb-2 ml-2 block">Shipment (รอบรถ)</label>
+                <div className="relative">
+                  <select
+                    required
+                    value={shipmentId}
+                    onChange={(e) => setShipmentId(e.target.value)}
+                    className="w-full px-5 py-4 bg-gray-50 rounded-2xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 text-lg transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="" disabled>Select Shipment / Target...</option>
+                    {shipments.map(s => (
+                      <option key={s.shipment_id} value={s.shipment_id}>
+                        {s.shipment_id} ({s.license_plate})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
+                </div>
               </div>
             </div>
 

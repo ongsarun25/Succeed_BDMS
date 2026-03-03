@@ -1,17 +1,24 @@
 'use client';
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Check, CheckSquare, Square, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { ArrowLeft, Check, Package, Loader2, ScanBarcode, AlertCircle, CheckCircle2 } from "lucide-react";
+import { supabase } from "@/lib/auth";
+
+type PickDetail = {
+  out_detail_id: string;
+  serial_no: string;
+  time_picked_by: string | null;
+  part_obj: { part_id: string };
+  location_id: string; // From current_stock
+};
 
 type GroupedPickItem = {
   id: string; // partId + "_" + location
   partId: string;
   location: string;
-  qty: number;
-  isPicked: boolean;
-  detailIds: string[]; // Store out_detail_id to update them later
+  totalQty: number;
+  pickedQty: number;
 };
 
 function PickDetailContent() {
@@ -19,127 +26,164 @@ function PickDetailContent() {
   const searchParams = useSearchParams();
   const outboundId = searchParams.get('id');
 
-  const [items, setItems] = useState<GroupedPickItem[]>([]);
+  const [details, setDetails] = useState<PickDetail[]>([]);
+  const [groupedItems, setGroupedItems] = useState<GroupedPickItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [scanInput, setScanInput] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const scanInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (!outboundId) return;
-
-    const fetchPickData = async () => {
-      try {
-        setLoading(true);
-        // Fetch details for this outbound order
-        const { data, error } = await supabase
-          .from('outbound_detail')
-          .select(`
-            out_detail_id,
-            serial_no,
-            time_picked_by,
-            part_obj ( part_id )
-          `)
-          .eq('outbound_id', outboundId);
-
-        if (error) throw error;
-
-        if (!data || data.length === 0) {
-          setLoading(false);
-          return;
-        }
-
-        // Fetch location for these serial numbers from current_stock
-        const serials = data.map(d => d.serial_no).filter(Boolean);
-        const { data: stockData, error: stockError } = await supabase
-          .from('current_stock')
-          .select('serial_no, location_id')
-          .in('serial_no', serials);
-
-        if (stockError) throw stockError;
-
-        // Map location back
-        const stockMap = new Map(stockData?.map(s => [s.serial_no, s.location_id]));
-
-        // Group data by part_id and location_id
-        const groups: Record<string, GroupedPickItem> = {};
-
-        data.forEach((row: any) => {
-          const partId = row.part_obj?.part_id || 'Unknown Part';
-          const location = stockMap.get(row.serial_no) || 'Unknown Location';
-          const isRowPicked = !!row.time_picked_by;
-
-          const groupId = `${partId}_${location}`;
-
-          if (!groups[groupId]) {
-            groups[groupId] = {
-              id: groupId,
-              partId,
-              location,
-              qty: 0,
-              isPicked: true, // will set to false if any item is not picked
-              detailIds: []
-            };
-          }
-
-          groups[groupId].qty += 1;
-          groups[groupId].detailIds.push(row.out_detail_id);
-          if (!isRowPicked) {
-            groups[groupId].isPicked = false;
-          }
-        });
-
-        // Convert the object back to an array
-        setItems(Object.values(groups));
-      } catch (err: any) {
-        console.error("Unexpected error fetching pick data:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchPickData();
   }, [outboundId]);
 
-  const togglePick = (id: string) => {
-    setItems(items.map(item =>
-      item.id === id ? { ...item, isPicked: !item.isPicked } : item
-    ));
+  const fetchPickData = async () => {
+    try {
+      setLoading(true);
+      // Fetch details for this outbound order
+      const { data, error } = await supabase
+        .from('outbound_detail')
+        .select(`
+          out_detail_id,
+          serial_no,
+          time_picked_by,
+          part_obj ( part_id )
+        `)
+        .eq('outbound_id', outboundId);
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      // Fetch location for these serial numbers from current_stock
+      const serials = data.map(d => d.serial_no).filter(Boolean);
+      const { data: stockData, error: stockError } = await supabase
+        .from('current_stock')
+        .select('serial_no, location_id')
+        .in('serial_no', serials);
+
+      if (stockError) throw stockError;
+
+      const stockMap = new Map(stockData?.map(s => [s.serial_no, s.location_id]));
+
+      const formattedDetails: PickDetail[] = data.map((d: any) => ({
+        out_detail_id: d.out_detail_id,
+        serial_no: d.serial_no,
+        time_picked_by: d.time_picked_by,
+        part_obj: { part_id: d.part_obj?.part_id || 'Unknown' },
+        location_id: stockMap.get(d.serial_no) || 'Unknown'
+      }));
+
+      setDetails(formattedDetails);
+      updateGroupedItems(formattedDetails);
+
+    } catch (err: any) {
+      console.error("Unexpected error fetching pick data:", err);
+      setErrorMsg("Failed to load pick list: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateGroupedItems = (currentDetails: PickDetail[]) => {
+    const groups: Record<string, GroupedPickItem> = {};
+
+    currentDetails.forEach(row => {
+      const partId = row.part_obj.part_id;
+      const location = row.location_id;
+      const groupId = `${partId}_${location}`;
+
+      if (!groups[groupId]) {
+        groups[groupId] = {
+          id: groupId,
+          partId,
+          location,
+          totalQty: 0,
+          pickedQty: 0
+        };
+      }
+
+      groups[groupId].totalQty += 1;
+      if (row.time_picked_by) {
+        groups[groupId].pickedQty += 1;
+      }
+    });
+
+    setGroupedItems(Object.values(groups));
+  };
+
+  const handleScan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    const serial = scanInput.trim();
+    if (!serial) return;
+
+    // Find in the reserved details
+    const targetDetail = details.find(d => d.serial_no === serial);
+
+    if (!targetDetail) {
+      setErrorMsg(`Serial ${serial} not found in this order's picking list!`);
+      setScanInput("");
+      return;
+    }
+
+    if (targetDetail.time_picked_by) {
+      setErrorMsg(`Serial ${serial} has already been picked!`);
+      setScanInput("");
+      return;
+    }
+
+    // Mark as picked
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('outbound_detail')
+        .update({ time_picked_by: now })
+        .eq('out_detail_id', targetDetail.out_detail_id);
+
+      if (error) throw error;
+
+      // Update local state
+      const updatedDetails = details.map(d =>
+        d.out_detail_id === targetDetail.out_detail_id
+          ? { ...d, time_picked_by: now }
+          : d
+      );
+      setDetails(updatedDetails);
+      updateGroupedItems(updatedDetails);
+
+      setSuccessMsg(`Picked: ${serial}`);
+      setScanInput("");
+
+      // Keep focus on input for next scan
+      if (scanInputRef.current) {
+        scanInputRef.current.focus();
+      }
+
+    } catch (err: any) {
+      setErrorMsg("Failed to update: " + err.message);
+    }
   };
 
   const handleConfirm = async () => {
-    const allPicked = items.every(item => item.isPicked);
+    const allPicked = details.every(d => d.time_picked_by !== null);
+
     if (!allPicked) {
-      const confirmIncomplete = confirm("ยังหยิบของไม่ครบ ยืนยันที่จะทำการบันทึกหรือไม่?");
+      const confirmIncomplete = confirm("You have not picked all items. Are you sure you want to finish?");
       if (!confirmIncomplete) return;
     }
 
     try {
       setSaving(true);
-
-      const pickedDetailIds = items.filter(i => i.isPicked).flatMap(i => i.detailIds);
-      const unpickedDetailIds = items.filter(i => !i.isPicked).flatMap(i => i.detailIds);
-
-      if (pickedDetailIds.length > 0) {
-        const { error } = await supabase
-          .from('outbound_detail')
-          .update({
-            time_picked_by: new Date().toISOString(),
-          })
-          .in('out_detail_id', pickedDetailIds);
-
-        if (error) throw error;
-      }
-
-      if (unpickedDetailIds.length > 0) {
-        const { error } = await supabase
-          .from('outbound_detail')
-          .update({
-            time_picked_by: null
-          })
-          .in('out_detail_id', unpickedDetailIds);
-
-        if (error) throw error;
-      }
-
       // If full order picked, update Outbound status
       if (allPicked) {
         await supabase
@@ -148,7 +192,7 @@ function PickDetailContent() {
           .eq('outbound_id', outboundId);
       }
 
-      alert(`✅ บันทึกการหยิบของออเดอร์ ${outboundId} เรียบร้อย!`);
+      alert(`✅ Finished picking for Order ${outboundId}!`);
       router.push('/dashboard/outbound');
     } catch (error: any) {
       console.error("Error updating pick status:", error);
@@ -161,105 +205,169 @@ function PickDetailContent() {
   if (!outboundId) {
     return (
       <div className="w-full flex justify-center items-center h-[80vh] flex-col gap-4">
-        <p className="text-2xl font-bold text-gray-500">โปรดระบุ Outbound ID</p>
-        <button onClick={() => router.back()} className="px-6 py-3 mt-4 bg-blue-600 text-white rounded-xl text-xl font-bold hover:bg-blue-700">กลับไปยังเมนูหลัก</button>
+        <p className="text-2xl font-bold text-gray-500">Missing Outbound ID</p>
+        <button onClick={() => router.back()} className="px-6 py-3 mt-4 bg-blue-600 text-white rounded-xl text-xl font-bold hover:bg-blue-700">Go Back</button>
       </div>
     );
   }
 
-  return (
-    <div className="w-full h-full min-h-[80vh] flex flex-col items-center justify-center p-6 animate-in slide-in-from-right-8 duration-500">
-      <div className="w-full max-w-3xl">
+  const totalRequired = details.length;
+  const totalPicked = details.filter(d => d.time_picked_by).length;
+  const progressPercent = totalRequired === 0 ? 0 : Math.round((totalPicked / totalRequired) * 100);
 
-        {/* Header */}
-        <div className="text-center mb-10">
-          <h1 className="text-4xl md:text-5xl font-bold text-[#1a237e] drop-shadow-sm mb-2">
-            Pick Detail
+  return (
+    <div className="w-full h-full p-6 max-w-5xl mx-auto flex flex-col items-center animate-in fade-in duration-300">
+      {/* Header */}
+      <div className="w-full flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-[24px] shadow-sm border border-gray-100 mb-6 gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-[#1a237e] flex items-center gap-3">
+            <Package className="w-8 h-8 text-blue-500" />
+            Pick Outbound Order
           </h1>
-          <p className="text-xl font-bold text-gray-600 bg-white inline-block px-6 py-2 rounded-full shadow-sm border border-gray-100">
-            ID: {outboundId}
-          </p>
+          <p className="text-gray-500 font-medium mt-1 text-lg">Order ID: <span className="text-blue-600 font-bold">{outboundId}</span></p>
         </div>
 
-        {/* Box List */}
-        <div className="bg-white rounded-[32px] shadow-lg border border-gray-100 p-8 min-h-[400px] flex flex-col relative">
+        {/* Progress Circle */}
+        <div className="flex items-center gap-4 bg-blue-50 px-6 py-4 rounded-2xl border border-blue-100">
+          <div className="flex flex-col text-right">
+            <span className="text-sm font-bold text-blue-400 uppercase tracking-widest">Progress</span>
+            <span className="text-3xl font-black text-blue-700">{totalPicked} / {totalRequired}</span>
+          </div>
+          <div className="w-16 h-16 rounded-full border-4 border-blue-200 flex items-center justify-center relative overflow-hidden bg-white">
+            <div
+              className="absolute bottom-0 left-0 w-full bg-blue-500 transition-all duration-500"
+              style={{ height: `${progressPercent}%` }}
+            />
+            <span className="relative z-10 font-bold text-sm text-gray-800 mix-blend-hard-light">{progressPercent}%</span>
+          </div>
+        </div>
+      </div>
 
-          {loading ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-4">
-              <Loader2 className="w-12 h-12 animate-spin text-blue-500" />
-              <p className="text-lg font-medium animate-pulse">กำลังโหลดข้อมูลรายการ...</p>
-            </div>
-          ) : items.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-4">
-              <p className="text-xl font-medium text-red-500">ไม่พบรายการเบิกจ่ายของออเดอร์นี้</p>
-              <p className="text-gray-400">กรุณาตรวจสอบ Outbound ID ให้ถูกต้อง</p>
-            </div>
-          ) : (
-            <>
-              {/* ตารางหัว */}
-              <div className="grid grid-cols-12 text-xl font-bold text-gray-900 mb-6 px-4 border-b-2 border-gray-100 pb-4">
-                <div className="col-span-5">Part ID</div>
-                <div className="col-span-3 text-center">Location</div>
-                <div className="col-span-2 text-center">Qty</div>
-                <div className="col-span-2 text-center">Status</div>
+      <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* Left Side: Scanner Input & Status */}
+        <div className="lg:col-span-1 flex flex-col gap-6">
+          <form onSubmit={handleScan} className="bg-white p-6 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 flex flex-col">
+            <label className="text-xl font-bold text-gray-900 mb-4 block flex items-center gap-2">
+              <ScanBarcode className="w-6 h-6 text-blue-600" />
+              Scan Serial Number
+            </label>
+            <input
+              ref={scanInputRef}
+              type="text"
+              value={scanInput}
+              onChange={(e) => setScanInput(e.target.value)}
+              placeholder="Aim scanner here..."
+              className="w-full px-5 py-4 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300 focus:outline-none focus:border-blue-500 focus:bg-blue-50 text-xl font-medium transition-all text-center placeholder:text-gray-400"
+              autoFocus
+              disabled={loading || totalPicked === totalRequired}
+            />
+            <button
+              type="submit"
+              className="mt-4 w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors hidden"
+              disabled={loading || !scanInput}
+            >
+              Scan
+            </button>
+
+            {/* Scan Feedback */}
+            {errorMsg && (
+              <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-xl border border-red-200 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+                <AlertCircle className="w-6 h-6 shrink-0 mt-0.5" />
+                <p className="font-medium text-sm">{errorMsg}</p>
               </div>
+            )}
+            {successMsg && (
+              <div className="mt-4 p-4 bg-green-50 text-green-700 rounded-xl border border-green-200 flex items-center gap-3 animate-in fade-in zoom-in-95">
+                <CheckCircle2 className="w-6 h-6 shrink-0" />
+                <p className="font-bold">{successMsg}</p>
+              </div>
+            )}
+            {totalPicked === totalRequired && totalRequired > 0 && (
+              <div className="mt-4 p-4 bg-green-100 text-green-800 rounded-xl border border-green-300 flex flex-col items-center justify-center gap-2 animate-in zoom-in-95">
+                <CheckCircle2 className="w-10 h-10" />
+                <p className="font-black text-lg text-center">All items picked!</p>
+              </div>
+            )}
+          </form>
 
-              {/* รายการ */}
-              <div className="flex-1 space-y-4 px-4 overflow-y-auto max-h-[40vh]">
-                {items.map((item) => (
+          {/* Action Buttons */}
+          <div className="flex gap-4">
+            <button
+              onClick={() => router.back()}
+              className="flex-1 py-4 bg-white text-gray-700 rounded-[20px] shadow-sm border border-gray-200 font-bold hover:bg-gray-50 transition-colors"
+            >
+              Back
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={saving || loading || totalRequired === 0}
+              className={`flex-[2] py-4 rounded-[20px] shadow-md font-bold text-white transition-all flex items-center justify-center gap-2 ${totalPicked === totalRequired
+                  ? 'bg-green-600 hover:bg-green-700 shadow-green-600/20'
+                  : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20'
+                } disabled:opacity-50 disabled:grayscale`}
+            >
+              {saving ? <Loader2 className="w-6 h-6 animate-spin" /> : <Check className="w-6 h-6 stroke-[3px]" />}
+              {saving ? "Saving..." : "Finish Picking"}
+            </button>
+          </div>
+        </div>
+
+        {/* Right Side: Pick List visually grouped */}
+        <div className="lg:col-span-2 bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 flex flex-col overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
+            <h2 className="text-xl font-bold text-gray-800">Picking Plan</h2>
+            <p className="text-sm text-gray-500 font-medium">Locations and quantities to pick</p>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar max-h-[60vh]">
+            {loading ? (
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-4">
+                <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
+                <p className="font-medium animate-pulse">Loading pick list...</p>
+              </div>
+            ) : groupedItems.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3">
+                <Package className="w-12 h-12 text-gray-300" />
+                <p className="font-medium text-lg">No items to pick for this order.</p>
+              </div>
+            ) : (
+              groupedItems.map(group => {
+                const isCompleted = group.pickedQty === group.totalQty;
+                return (
                   <div
-                    key={item.id}
-                    onClick={() => togglePick(item.id)}
-                    className={`grid grid-cols-12 items-center text-lg font-medium p-4 rounded-2xl cursor-pointer transition-all border-2 ${item.isPicked
-                      ? 'bg-green-50 border-green-200 text-green-800'
-                      : 'bg-gray-50 border-transparent hover:border-gray-200 text-gray-700'
+                    key={group.id}
+                    className={`flex items-center justify-between p-5 rounded-2xl border-2 transition-all ${isCompleted
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-white border-gray-100 hover:border-blue-100 hover:shadow-sm'
                       }`}
                   >
-                    <div className="col-span-5">{item.partId}</div>
-                    <div className="col-span-3 text-center text-blue-600 font-bold">{item.location}</div>
-                    <div className="col-span-2 text-center font-black text-2xl">{item.qty}</div>
-                    <div className="col-span-2 flex justify-center">
-                      {item.isPicked ? (
-                        <CheckSquare className="w-8 h-8 text-green-500" />
-                      ) : (
-                        <Square className="w-8 h-8 text-gray-300" />
+                    <div className="flex flex-col gap-1">
+                      <span className="text-gray-500 text-sm font-bold uppercase tracking-wider">Part ID</span>
+                      <span className={`text-xl font-black ${isCompleted ? 'text-green-800' : 'text-gray-900'}`}>{group.partId}</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="inline-flex items-center justify-center px-2 py-1 rounded bg-gray-100 text-gray-600 text-xs font-bold border border-gray-200">
+                          Location
+                        </span>
+                        <span className="text-blue-600 font-bold">{group.location}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="flex items-baseline gap-1">
+                        <span className={`text-4xl font-black ${isCompleted ? 'text-green-600' : 'text-blue-600'}`}>{group.pickedQty}</span>
+                        <span className="text-xl font-bold text-gray-400">/ {group.totalQty}</span>
+                      </div>
+                      {isCompleted && (
+                        <span className="flex items-center gap-1 text-sm font-bold text-green-600 bg-green-100 px-2.5 py-1 rounded-lg">
+                          <CheckCircle2 className="w-4 h-4" /> Picked
+                        </span>
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
-            </>
-          )}
-
-        </div>
-
-        {/* ปุ่มด้านล่าง */}
-        <div className="flex justify-between items-center mt-10 px-2">
-          <button
-            onClick={() => router.back()}
-            disabled={saving || loading}
-            className="w-16 h-16 bg-white rounded-[24px] shadow-md border border-gray-100 flex items-center justify-center hover:bg-gray-50 transition-all hover:-translate-x-1 disabled:opacity-50"
-          >
-            <ArrowLeft className="w-8 h-8 text-black stroke-[3px]" />
-          </button>
-
-          <button
-            onClick={handleConfirm}
-            disabled={saving || loading || items.length === 0}
-            className="h-16 bg-white border border-gray-100 rounded-[24px] shadow-sm flex items-center justify-center px-8 gap-3 hover:bg-gray-50 transition-all active:scale-95 disabled:opacity-50"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="w-8 h-8 text-[#3ea043] animate-spin" />
-                <span className="text-[#3ea043] font-bold text-xl">Saving...</span>
-              </>
-            ) : (
-              <>
-                <span className="text-[#3ea043] font-bold text-3xl">Done</span>
-                <Check className="w-8 h-8 text-[#3ea043] stroke-[4px]" />
-              </>
+                );
+              })
             )}
-          </button>
+          </div>
         </div>
 
       </div>
