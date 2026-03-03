@@ -15,6 +15,9 @@ type OutboundOrder = {
     customer: { name: string };
     shipment: { license_plate: string };
     raw_details: { count: number }[]; // Just to get a count
+    outbound_detail?: {
+        part_obj: { part_master: { part_name: string } }
+    }[];
 };
 
 export default function OutboundHistoryPage() {
@@ -42,7 +45,7 @@ export default function OutboundHistoryPage() {
           updated_at,
           customer:customer_id ( name ),
           shipment:shipment_id ( license_plate ),
-          outbound_detail ( count )
+          outbound_detail ( part_obj ( part_master ( part_name ) ) )
         `)
                 .order('created_at', { ascending: false });
 
@@ -111,7 +114,6 @@ export default function OutboundHistoryPage() {
                         className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-gray-700 min-w-[150px] cursor-pointer"
                     >
                         <option value="All">All Status</option>
-                        <option value="Pending">Pending</option>
                         <option value="Picked">Picked</option>
                         <option value="Shipped">Shipped</option>
                     </select>
@@ -132,17 +134,31 @@ export default function OutboundHistoryPage() {
                     </div>
                 ) : (
                     filteredOrders.map(order => {
-                        // @ts-ignore - Supabase join count returns an array of {count: number}
-                        const itemCount = order.outbound_detail?.[0]?.count || 0;
+                        // Calculate item count from the array length or count object
+                        const itemCount = Array.isArray(order.outbound_detail) ? order.outbound_detail.length : 0;
+
+                        // Group items by part name to show quantities
+                        const itemSummary = (order.outbound_detail || []).reduce((acc: any, curr: any) => {
+                            const po = Array.isArray(curr.part_obj) ? curr.part_obj[0] : curr.part_obj;
+                            const pm = po && (Array.isArray(po.part_master) ? po.part_master[0] : po.part_master);
+                            const name = pm?.part_name || 'Unknown Part';
+                            acc[name] = (acc[name] || 0) + 1;
+                            return acc;
+                        }, {});
 
                         return (
                             <div key={order.outbound_id} className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-emerald-200 transition-all group flex flex-col gap-4 relative overflow-hidden">
 
                                 {/* Status Badge */}
-                                <div className="absolute top-6 right-6">
+                                <div className="absolute top-6 right-6 flex flex-col gap-2 items-end">
                                     <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border ${getStatusStyle(order.outstatus)}`}>
                                         {order.outstatus}
                                     </span>
+                                    {order.pod_status === 'Signed' && (
+                                        <span className="flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-200 uppercase tracking-widest">
+                                            <CheckCircle2 className="w-3 h-3" /> POD Signed
+                                        </span>
+                                    )}
                                 </div>
 
                                 {/* ID & Date */}
@@ -184,10 +200,35 @@ export default function OutboundHistoryPage() {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Item Summary List */}
+                                    {Object.keys(itemSummary).length > 0 && (
+                                        <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 flex flex-col gap-1.5 mt-2">
+                                            <p className="text-xs font-bold text-gray-500 uppercase mb-1">Items List</p>
+                                            {Object.entries(itemSummary).map(([name, qty]) => (
+                                                <div key={name} className="flex justify-between items-center text-sm">
+                                                    <span className="text-gray-700 font-medium truncate pr-4">{name}</span>
+                                                    <span className="font-bold text-gray-900 bg-white px-2 py-0.5 rounded shadow-sm border border-gray-100 shrink-0">x{qty as number}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
                                 </div>
 
+                                {/* POD Info if available */}
+                                {order.pod_status === 'Signed' && (
+                                    <div className="mt-2 bg-gradient-to-r from-orange-50 to-transparent p-3 rounded-xl border border-orange-100 flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-orange-800">
+                                            <CheckCircle2 className="w-5 h-5" />
+                                            <span className="font-bold text-sm">Delivery Confirmed</span>
+                                        </div>
+                                        <span className="text-xs font-medium text-orange-600/70">{new Date(order.updated_at).toLocaleString()}</span>
+                                    </div>
+                                )}
+
                             </div>
-                        )
+                        );
                     })
                 )}
             </div>

@@ -59,13 +59,20 @@ export default function CreateOutboundPage() {
       if (!data || data.role !== 'Manager') {
         alert("Access Denied: คุณไม่มีสิทธิ์เข้าถึงหน้านี้ (เฉพาะผู้จัดการเท่านั้น)");
         router.push('/dashboard/outbound');
-      } else {
         setRoleLoading(false);
       }
     };
 
     checkRole();
   }, [router]);
+
+  // Fetch current user details since the manager is picking it instantly
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUser(data.user?.id || null);
+    });
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -184,17 +191,20 @@ export default function CreateOutboundPage() {
           order_date: new Date().toISOString().split('T')[0],
           customer_id: customerId,
           shipment_id: shipmentId,
-          outstatus: 'Pending',
+          // SKIP PENDING - The exact items are known, moving directly to Picked status
+          outstatus: 'Picked',
           pod_status: 'Pending'
         });
 
       if (headerError) throw headerError;
 
-      // 5. Create Outbound Details (Line Items)
+      // 5. Create Outbound Details & Auto-Pick
+      const now = new Date().toISOString();
       const detailsToInsert = reservedSerials.map(serial => ({
         outbound_id: newOutboundId,
         serial_no: serial,
-        // Trigger `trg_outbound_stock_update` will automatically set current_stock.status to 'In Transit'
+        time_picked_by: now,
+        picker_user_id: currentUser,
       }));
 
       const { error: detailsError } = await supabase
@@ -203,8 +213,17 @@ export default function CreateOutboundPage() {
 
       if (detailsError) throw detailsError;
 
-      alert(`✅ Created Outbound Order: ${newOutboundId} successfully! Automatically reserved ${reservedSerials.length} items.`);
-      router.push('/dashboard/outbound/pick');
+      // 6. Update Stock to In Transit
+      // Note: If you have a trigger it might do this, but just to be sure
+      const { error: stockUpdateError } = await supabase
+        .from('current_stock')
+        .update({ status: 'In Transit' })
+        .in('serial_no', reservedSerials);
+
+      if (stockUpdateError) throw stockUpdateError;
+
+      alert(`✅ Created Outbound Order: ${newOutboundId} successfully! Automatically Picked ${reservedSerials.length} items.`);
+      router.push('/dashboard/outbound/history');
 
     } catch (err: any) {
       console.error(err);

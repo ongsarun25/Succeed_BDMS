@@ -126,9 +126,9 @@ export default function InventoryPage() {
     };
 
     return (
-        <div className="w-full h-full p-6 max-w-[1600px] mx-auto flex flex-col gap-6 animate-in fade-in duration-300">
+        <div className="w-full h-[calc(100vh-80px)] p-6 max-w-[1600px] mx-auto flex flex-col gap-6 animate-in fade-in duration-300 overflow-hidden">
             {/* Header & Search */}
-            <div className="bg-white p-6 rounded-[24px] shadow-sm border border-gray-100 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="bg-white p-6 rounded-[24px] shadow-sm border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0">
                 <div>
                     <h1 className="text-3xl font-bold text-[#1a237e] flex items-center gap-3 drop-shadow-sm">
                         <Package className="w-8 h-8 text-indigo-500" />
@@ -190,8 +190,8 @@ export default function InventoryPage() {
             </div>
 
             {/* Data Table */}
-            <div className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 flex-1 overflow-hidden flex flex-col">
-                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <div className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 flex-1 flex flex-col min-h-0 overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
                     <h2 className="font-bold text-gray-700">Inventory List ({filteredStock.length} items)</h2>
                     <button
                         onClick={() => fetchStock()}
