@@ -204,7 +204,7 @@ export default function CreateOutboundPage() {
       if (detailsError) throw detailsError;
 
       alert(`✅ Created Outbound Order: ${newOutboundId} successfully! Automatically reserved ${reservedSerials.length} items.`);
-      router.push('/dashboard/outbound/order');
+      router.push('/dashboard/outbound/pick');
 
     } catch (err: any) {
       console.error(err);

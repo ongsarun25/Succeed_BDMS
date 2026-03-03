@@ -30,6 +30,13 @@ function PickDetailContent() {
   const [groupedItems, setGroupedItems] = useState<GroupedPickItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUser(data.user?.id || null);
+    });
+  }, []);
 
   const [scanInput, setScanInput] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -127,13 +134,64 @@ function PickDetailContent() {
     const serial = scanInput.trim();
     if (!serial) return;
 
-    // Find in the reserved details
     const targetDetail = details.find(d => d.serial_no === serial);
 
     if (!targetDetail) {
-      setErrorMsg(`Serial ${serial} not found in this order's picking list!`);
-      setScanInput("");
-      return;
+      // Attempt to Swap if not found (find an identical part that is available)
+      try {
+        const { data: stockData, error: stockErr } = await supabase
+          .from('current_stock')
+          .select('serial_no, status, part_obj!inner(part_id)')
+          .eq('serial_no', serial)
+          .single();
+
+        if (stockErr) throw new Error("Stock fetch error: " + stockErr.message);
+
+        if (stockData && stockData.status === 'Available') {
+          // Find an unpicked item in this order with the same part_id
+          const fetchedPartId = Array.isArray(stockData.part_obj) ? stockData.part_obj[0]?.part_id : (stockData.part_obj as any)?.part_id;
+          const replaceableDetail = details.find(d => !d.time_picked_by && d.part_obj.part_id === fetchedPartId);
+
+          if (replaceableDetail) {
+            const oldSerial = replaceableDetail.serial_no;
+            const now = new Date().toISOString();
+
+            // 1. Release old serial to Available
+            const { error: err1 } = await supabase.from('current_stock').update({ status: 'Available' }).eq('serial_no', oldSerial);
+            if (err1) throw new Error("Release old serial failed: " + err1.message);
+            // 2. Reserve new serial
+            const { error: err2 } = await supabase.from('current_stock').update({ status: 'In Transit' }).eq('serial_no', serial);
+            if (err2) throw new Error("Reserve new serial failed: " + err2.message);
+            // 3. Update outbound_detail to use new serial and set it as picked
+            const { error: err3 } = await supabase.from('outbound_detail').update({ serial_no: serial, time_picked_by: now, picker_user_id: currentUser }).eq('out_detail_id', replaceableDetail.out_detail_id);
+            if (err3) throw new Error("Update outbound detail failed: " + err3.message);
+
+            // 4. Update local state
+            const updatedDetails = details.map(d =>
+              d.out_detail_id === replaceableDetail.out_detail_id
+                ? { ...d, serial_no: serial, time_picked_by: now }
+                : d
+            );
+            setDetails(updatedDetails);
+            updateGroupedItems(updatedDetails);
+
+            setSuccessMsg(`Picked & Swapped: ${serial}`);
+            setScanInput("");
+            if (scanInputRef.current) scanInputRef.current.focus();
+            return;
+          } else {
+            const fetchedPartId = Array.isArray(stockData.part_obj) ? stockData.part_obj[0]?.part_id : (stockData.part_obj as any)?.part_id;
+            throw new Error(`Part ${fetchedPartId} needs picking, but no matching unpicked slots left in this order.`);
+          }
+        } else {
+          throw new Error(`Cannot swap: Serial ${serial} has status '${stockData?.status || 'Unknown'}', expected 'Available'.`);
+        }
+      } catch (err: any) {
+        console.error("Swap check failed", err);
+        setErrorMsg(`Swap error: ${err.message}`);
+        setScanInput("");
+        return;
+      }
     }
 
     if (targetDetail.time_picked_by) {
@@ -147,7 +205,7 @@ function PickDetailContent() {
       const now = new Date().toISOString();
       const { error } = await supabase
         .from('outbound_detail')
-        .update({ time_picked_by: now })
+        .update({ time_picked_by: now, picker_user_id: currentUser })
         .eq('out_detail_id', targetDetail.out_detail_id);
 
       if (error) throw error;
@@ -177,25 +235,43 @@ function PickDetailContent() {
   const handleConfirm = async () => {
     const allPicked = details.every(d => d.time_picked_by !== null);
 
-    if (!allPicked) {
-      const confirmIncomplete = confirm("You have not picked all items. Are you sure you want to finish?");
-      if (!confirmIncomplete) return;
-    }
+    if (!allPicked) return; // Strict block: Cannot finish if not complete
 
     try {
       setSaving(true);
-      // If full order picked, update Outbound status
-      if (allPicked) {
-        await supabase
-          .from('outbound_order')
-          .update({ outstatus: 'Picked' })
-          .eq('outbound_id', outboundId);
-      }
+
+      await supabase
+        .from('outbound_order')
+        .update({ outstatus: 'Picked' })
+        .eq('outbound_id', outboundId);
 
       alert(`✅ Finished picking for Order ${outboundId}!`);
-      router.push('/dashboard/outbound');
+      router.push('/dashboard/outbound/history');
     } catch (error: any) {
       console.error("Error updating pick status:", error);
+      alert("Error: " + error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!confirm("Are you sure you want to CANCEL this entire Outbound Order? All reservations will be removed and stock returned to Available.")) return;
+
+    try {
+      setSaving(true);
+      const serials = details.map(d => d.serial_no);
+      if (serials.length > 0) {
+        await supabase.from('current_stock').update({ status: 'Available' }).in('serial_no', serials);
+      }
+
+      await supabase.from('outbound_detail').delete().eq('outbound_id', outboundId);
+      await supabase.from('outbound_order').delete().eq('outbound_id', outboundId);
+
+      alert(`Order ${outboundId} cancelled successfully.`);
+      router.push('/dashboard/outbound/pick');
+    } catch (error: any) {
+      console.error("Error cancelling order:", error);
       alert("Error: " + error.message);
     } finally {
       setSaving(false);
@@ -292,7 +368,7 @@ function PickDetailContent() {
           </form>
 
           {/* Action Buttons */}
-          <div className="flex gap-4">
+          <div className="flex gap-4 mb-4">
             <button
               onClick={() => router.back()}
               className="flex-1 py-4 bg-white text-gray-700 rounded-[20px] shadow-sm border border-gray-200 font-bold hover:bg-gray-50 transition-colors"
@@ -301,16 +377,24 @@ function PickDetailContent() {
             </button>
             <button
               onClick={handleConfirm}
-              disabled={saving || loading || totalRequired === 0}
+              disabled={saving || loading || totalRequired === 0 || totalPicked < totalRequired}
               className={`flex-[2] py-4 rounded-[20px] shadow-md font-bold text-white transition-all flex items-center justify-center gap-2 ${totalPicked === totalRequired
-                  ? 'bg-green-600 hover:bg-green-700 shadow-green-600/20'
-                  : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20'
-                } disabled:opacity-50 disabled:grayscale`}
+                ? 'bg-green-600 hover:bg-green-700 shadow-green-600/20'
+                : 'bg-gray-400 cursor-not-allowed'
+                }`}
             >
               {saving ? <Loader2 className="w-6 h-6 animate-spin" /> : <Check className="w-6 h-6 stroke-[3px]" />}
               {saving ? "Saving..." : "Finish Picking"}
             </button>
           </div>
+
+          <button
+            onClick={handleCancelOrder}
+            disabled={saving || loading}
+            className="w-full py-3 bg-red-50 text-red-600 rounded-[20px] border border-red-200 font-bold hover:bg-red-100 transition-colors"
+          >
+            Cancel Entire Order
+          </button>
         </div>
 
         {/* Right Side: Pick List visually grouped */}
@@ -338,8 +422,8 @@ function PickDetailContent() {
                   <div
                     key={group.id}
                     className={`flex items-center justify-between p-5 rounded-2xl border-2 transition-all ${isCompleted
-                        ? 'bg-green-50 border-green-200'
-                        : 'bg-white border-gray-100 hover:border-blue-100 hover:shadow-sm'
+                      ? 'bg-green-50 border-green-200'
+                      : 'bg-white border-gray-100 hover:border-blue-100 hover:shadow-sm'
                       }`}
                   >
                     <div className="flex flex-col gap-1">

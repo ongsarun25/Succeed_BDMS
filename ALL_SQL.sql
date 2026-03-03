@@ -200,3 +200,21 @@ execute FUNCTION generate_shipment_id ();
 create trigger trg_set_timestamp_shipment BEFORE
 update on shipment for EACH row
 execute FUNCTION auto_update_timestamp ();
+
+create view public.vw_current_stock_details as
+select
+  cs.serial_no,
+  pm.part_id,
+  pm.part_name,
+  pm.uom,
+  cs.condition,
+  cs.status,
+  loc.location_id,
+  loc.zone_type,
+  cs.created_at as stock_in_date,
+  cs.updated_at as last_updated
+from
+  current_stock cs
+  join part_obj po on cs.serial_no::text = po.serial_no::text
+  join part_master pm on po.part_id::text = pm.part_id::text
+  left join location loc on cs.location_id::text = loc.location_id::text;

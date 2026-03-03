@@ -38,10 +38,10 @@ export default function OutboundMenuPage() {
       color: "hover:border-blue-500 hover:shadow-blue-100"
     },
     {
-      title: "3. Outbound Order",
-      description: "ตรวจสอบสถานะออเดอร์ ข้อมูลลูกค้า และประวัติการจัดส่ง",
+      title: "3. Outbound History",
+      description: "ตรวจสอบประวัติการเบิกจ่าย และสถานะสินค้าที่ออกจากคลัง",
       icon: <Box className="w-10 h-10 mb-4 text-emerald-600" />,
-      href: "/dashboard/outbound/order",
+      href: "/dashboard/outbound/history",
       color: "hover:border-emerald-500 hover:shadow-emerald-100"
     }
   ];
