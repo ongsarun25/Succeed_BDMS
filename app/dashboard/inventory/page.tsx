@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/auth";
-import { Search, Package, MapPin, Tag, Activity, RefreshCw, Filter } from "lucide-react";
+import { Search, Package, MapPin, Tag, Activity, RefreshCw, Filter, Undo2 } from "lucide-react";
 
 type StockItem = {
     serial_no: string;
@@ -24,6 +24,28 @@ export default function InventoryPage() {
     const [conditionFilter, setConditionFilter] = useState("");
     const [stockItems, setStockItems] = useState<StockItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+    const handleReturnToVendor = async (serialNo: string) => {
+        if (!confirm(`Are you sure you want to Return to Vendor for serial ${serialNo}?\nThis will remove it from the stock permanently.`)) return;
+
+        setActionLoading(serialNo);
+        try {
+            const { error } = await supabase
+                .from('current_stock')
+                .delete()
+                .eq('serial_no', serialNo);
+
+            if (error) throw error;
+
+            await fetchStock();
+        } catch (error: any) {
+            console.error("Error returning to vendor:", error.message);
+            alert("Failed to return: " + error.message);
+        } finally {
+            setActionLoading(null);
+        }
+    };
 
     const fetchStock = async () => {
         setLoading(true);
@@ -201,6 +223,7 @@ export default function InventoryPage() {
                                     <th className="py-4 px-6 font-bold text-sm text-gray-500 uppercase tracking-wider">Condition</th>
                                     <th className="py-4 px-6 font-bold text-sm text-gray-500 uppercase tracking-wider">Status</th>
                                     <th className="py-4 px-6 font-bold text-sm text-gray-500 uppercase tracking-wider text-right">Last Updated</th>
+                                    <th className="py-4 px-6 font-bold text-sm text-gray-500 uppercase tracking-wider text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -239,6 +262,19 @@ export default function InventoryPage() {
                                             {new Date(item.updated_at).toLocaleString('en-GB', {
                                                 day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
                                             })}
+                                        </td>
+                                        <td className="py-4 px-6 whitespace-nowrap text-center">
+                                            {item.status === 'Quarantine' && (
+                                                <button
+                                                    onClick={() => handleReturnToVendor(item.serial_no)}
+                                                    disabled={actionLoading === item.serial_no}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-bold border border-red-200 transition-colors disabled:opacity-50"
+                                                    title="Return to Vendor"
+                                                >
+                                                    <Undo2 className="w-4 h-4" />
+                                                    {actionLoading === item.serial_no ? 'Processing...' : 'Return RTV'}
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
