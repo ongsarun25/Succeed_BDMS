@@ -22,6 +22,7 @@ export default function UnloadScanPage({ params }: { params: Promise<{ id: strin
     const [loading, setLoading] = useState(true);
 
     // Form State
+    const [scannedSerials, setScannedSerials] = useState<string[]>([]);
     const [selectedPart, setSelectedPart] = useState("");
     const [serialNo, setSerialNo] = useState("");
     const [condition, setCondition] = useState("Available");
@@ -71,6 +72,7 @@ export default function UnloadScanPage({ params }: { params: Promise<{ id: strin
                 return acc;
             }, []);
             setPlans(groupedPlans);
+            setScannedSerials(detailData?.map((d: any) => d.serial_no) || []);
 
             // Smart auto-select logic
             setSelectedPart(current => {
@@ -93,6 +95,12 @@ export default function UnloadScanPage({ params }: { params: Promise<{ id: strin
 
         setIsSubmitting(true);
         setScanMessage({ text: "", type: "" });
+
+        if (scannedSerials.includes(serialNo)) {
+            setScanMessage({ text: `Serial No: ${serialNo} ถูกสแกนไปแล้ว โปรดลองชิ้นอื่น`, type: "error" });
+            setIsSubmitting(false);
+            return;
+        }
 
         try {
             const currentPlan = plans.find(p => p.part_id === selectedPart);
@@ -249,7 +257,7 @@ export default function UnloadScanPage({ params }: { params: Promise<{ id: strin
 
                             <button
                                 type="submit"
-                                disabled={isSubmitting || !serialNo}
+                                disabled={isSubmitting || !serialNo || scannedSerials.includes(serialNo)}
                                 className={`w-full py-4 mt-2 font-bold text-xl rounded-2xl shadow-md disabled:opacity-50 transition-colors bg-blue-500 hover:bg-blue-400 text-white`}
                             >
                                 {isSubmitting ? "Receiving..." : "Register Item"}
