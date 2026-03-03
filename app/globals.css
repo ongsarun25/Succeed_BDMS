@@ -1,7 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
+@theme {
+  --color-foreground: #000;
+  --color-background: #fff;
+}
 @layer utilities {
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
